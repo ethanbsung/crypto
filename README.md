@@ -1,8 +1,10 @@
 This is a repository containing trading algorithms I am creating in the cryptocurrency space. 
 
+I am using python to determine Bitcoin market regimes over the past 5 years by training an HMM model
+
 I am using python to connect to trader's wallets that have outperformed the market. I do this by connecting to the platform BirdEye using an API.
 
-I am also creating a trading algorithm to trade the current crypto bull run progammatically. I will be creating various strategies that I believe will give me positive returns. Here I will be brainstorming strategies that I believe will give me the returns I am looking for.
+I am also creating a trading algorithm to trade the current crypto bull run progammatically. I will be creating various strategies that I believe will generate me positive returns. Here I will be brainstorming strategies that I believe will give me the returns I am looking for.
 
 Strategies:
 Solana copy bot - Copy the trades of whale investors who are outperforming the market. They know more than me, so I want trade how they trade.
