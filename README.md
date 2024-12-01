@@ -1,3 +1,14 @@
+This is one a folder containing trading algorithms in the cryptocurrency space. I am using python to connect to trader's wallets that have outperformed the market. I do this by connecting to the platform BirdEye using an API.
+
+I am also creating a trading algorithm to trade the current crypto bull run progammatically. I will be creating various strategies that I believe will give me positive returns. Here I will be brainstorming strategies that I believe will give me the returns I am looking for.
+
+Strategies:
+Solana copy bot - Copy the trades of whale investors who are outperforming the market. They know more than me, so I want trade how they trade.
+
+Trend Following Strategy - strategy to take advantage of the consistently increasing prices during a crypto bull run.
+
+Mean reversion strategy - take advantage of sideways moving markets through the belief that prices will always revert back to the mean
+
 copy bot list
 
 72e6QM7gn9MH5u1YpgQbduexm4WAon1cnsSXPqKnLQec

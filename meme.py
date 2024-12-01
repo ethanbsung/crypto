@@ -2,7 +2,7 @@ import ccxt
 import time
 import logging
 import dontshare
-from dontshare import API_KEY, SECRET_KEY
+import dontshare as d
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, filename='crypto_bot.log', filemode='a',
@@ -10,8 +10,8 @@ logging.basicConfig(level=logging.INFO, filename='crypto_bot.log', filemode='a',
 
 # Initialize Kraken API
 exchange = ccxt.kraken({
-    'apiKey': API_KEY,
-    'secret': SECRET_KEY,
+    'apiKey': d.API_KEY,
+    'secret': d.SECRET_KEY,
 })
 
 def fetch_usdc_balance():
