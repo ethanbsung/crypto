@@ -36,11 +36,11 @@ from ta.trend import ADXIndicator
 import pandas as pd
 
 class HighLowBreak(Strategy):
-    adx_period = 10
-    adx_low = 26
-    adx_high = 32
-    risk_reward_ratio = 2
-    stop_loss_pct = 0.03  # 2% stop loss
+    adx_period = 24
+    adx_low = 28
+    adx_high = 34
+    risk_reward_ratio = 4
+    stop_loss_pct = 0.01
 
     def init(self):
         high = self.data.High
@@ -60,10 +60,17 @@ class HighLowBreak(Strategy):
                 self.sell(sl=self.data.Close[-1] * (1 + self.stop_loss_pct),
                           tp=self.data.Close[-1] * (1 - self.stop_loss_pct * self.risk_reward_ratio))
 
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_240.csv')
+data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_30.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
+
+# Define date range
+start_date = '2023-01-01'
+end_date = '2024-11-30'
+
+# Filter data for date range
+data = data.loc[start_date:end_date]
 
 backtest = Backtest(data, HighLowBreak, cash=100000, commission=.0025)
 

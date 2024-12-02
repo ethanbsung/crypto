@@ -34,7 +34,7 @@ class HighLowBreak(Strategy):
                           tp=self.data.Close[-1] * (1 - self.stop_loss_pct * self.risk_reward_ratio))
 
 # Load data
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_60.csv')
+data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_30.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
