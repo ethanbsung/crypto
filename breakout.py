@@ -11,7 +11,7 @@ kraken = ccxt.kraken({
 })
 
 # Fetch historical OHLCV data
-def fetch_ohlcv(symbol, timeframe='5m', limit=500):
+def fetch_ohlcv(symbol, timeframe='1h', limit=500):
     print(f"Fetching data for {symbol}...")
     try:
         ohlcv = kraken.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
@@ -128,20 +128,28 @@ def plot_results(df, trade_log, equity_curve):
 
 # Main execution
 def main():
-    symbol = 'XBTUSDT'
-    timeframe = '1Hour'
+    symbol = 'XBT/USD'  # Use valid Kraken symbol
+    timeframe = '1h'    # Use valid timeframe
     initial_balance = 1000
-    df = fetch_ohlcv(symbol, timeframe)
-    df = calculate_relative_volume(df)
+    
+    try:
+        # Fetch historical data
+        df = fetch_ohlcv(symbol, timeframe)
+        df = calculate_relative_volume(df)
 
-    final_balance, trade_log, equity_curve = backtest_strategy(df, initial_balance=initial_balance)
-    metrics = calculate_metrics(trade_log, equity_curve, initial_balance)
+        # Backtest the strategy
+        final_balance, trade_log, equity_curve = backtest_strategy(df, initial_balance=initial_balance)
 
-    print("Metrics:")
-    for key, value in metrics.items():
-        print(f"{key}: {value}")
+        # Calculate metrics
+        metrics = calculate_metrics(trade_log, equity_curve, initial_balance)
+        print("Metrics:")
+        for key, value in metrics.items():
+            print(f"{key}: {value}")
 
-    plot_results(df, trade_log, equity_curve)
+        # Plot results
+        plot_results(df, trade_log, equity_curve)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
