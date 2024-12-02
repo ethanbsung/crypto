@@ -37,9 +37,14 @@ def calculate_adx(data):
 def execute_trade(symbol, side, amount, price):
     global in_trade
     try:
-        order = kraken.create_order(symbol, 'limit', side, amount, {'price': price})
-        print(f"Executed {side} limit order for {amount} of {symbol} at {price}")
-        in_trade = True  # Set the flag to True when a trade is executed
+        # Calculate the ETH amount based on USD trade_amount
+        eth_amount = trade_amount / price
+        # Round to 8 decimal places (Kraken's typical precision for crypto)
+        eth_amount = round(eth_amount, 8)
+        
+        order = kraken.create_order(symbol, 'limit', side, eth_amount, {'price': price})
+        print(f"Executed {side} limit order for {eth_amount} ETH (${trade_amount} worth) at ${price}")
+        in_trade = True
     except Exception as e:
         print(f"Error executing trade: {e}")
 
@@ -77,6 +82,8 @@ def run_strategy(symbol):
 
 if __name__ == "__main__":
     symbol = 'ETH/USD'
+    print(f"Bot started! Running strategy on {symbol}")
     while True:
+        print(f"Checking for trade opportunities... {pd.Timestamp.now()}")
         run_strategy(symbol)
-        time.sleep(300)  # Sleep for 300 seconds (5 minutes) before checking again
+        time.sleep(60)  # Sleep for 60 seconds before checking again
