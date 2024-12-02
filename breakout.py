@@ -1,7 +1,6 @@
 import ccxt
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import dontshare as d
 import time
 
@@ -70,7 +69,6 @@ def backtest_strategy(df, rvol_threshold=3, initial_balance=1000, trade_amount=1
 
 # Calculate metrics
 def calculate_metrics(trade_log, equity_curve, initial_balance):
-    trades = trade_log.groupby('type')
     buy_trades = trade_log[trade_log['type'] == 'buy']
     sell_trades = trade_log[trade_log['type'] == 'sell']
 
@@ -90,6 +88,11 @@ def calculate_metrics(trade_log, equity_curve, initial_balance):
     wins = len(gains)
     losses_count = len(losses)
 
+    # Max drawdown as a negative value
+    peak_equity = max(equity_curve)
+    trough_equity = min(equity_curve)
+    max_drawdown = (trough_equity - peak_equity) / peak_equity * 100
+
     win_rate = wins / total_trades * 100 if total_trades > 0 else 0
     avg_win = np.mean(gains) if gains else 0
     avg_loss = np.mean(losses) if losses else 0
@@ -97,12 +100,15 @@ def calculate_metrics(trade_log, equity_curve, initial_balance):
     sharpe_ratio = np.mean(equity_curve) / np.std(equity_curve) if np.std(equity_curve) > 0 else 0
     downside = [min(0, x - np.mean(equity_curve)) for x in equity_curve]
     sortino_ratio = np.mean(equity_curve) / np.std(downside) if np.std(downside) > 0 else 0
-    max_drawdown = np.min([min(0, x - initial_balance) for x in equity_curve])
     calmar_ratio = total_return / abs(max_drawdown) if max_drawdown < 0 else 0
 
     return {
-        'win_rate': win_rate,
+        'win_rate': f"{win_rate:.2f}%",
         'total_return': total_return,
+        'total_trades': total_trades,
+        'wins': wins,
+        'losses': losses_count,
+        'max_drawdown': f"{max_drawdown:.2f}%",
         'average_win': avg_win,
         'average_loss': avg_loss,
         'sharpe_ratio': sharpe_ratio,
@@ -110,25 +116,10 @@ def calculate_metrics(trade_log, equity_curve, initial_balance):
         'calmar_ratio': calmar_ratio
     }
 
-# Plot results
-def plot_results(df, trade_log, equity_curve):
-    plt.figure(figsize=(14, 7))
-    plt.plot(df['timestamp'], equity_curve, label='Equity Curve', color='blue')
-    plt.plot(df['timestamp'], df['close'], label='Price', color='orange', alpha=0.6)
-    for _, trade in trade_log.iterrows():
-        if trade['type'] == 'buy':
-            plt.scatter(trade['timestamp'], trade['price'], color='green', label='Buy Signal', marker='^')
-        elif trade['type'] == 'sell':
-            plt.scatter(trade['timestamp'], trade['price'], color='red', label='Sell Signal', marker='v')
-    plt.title('Backtesting Results')
-    plt.xlabel('Time')
-    plt.ylabel('Equity/Price')
-    plt.legend()
-    plt.show()
 
 # Main execution
 def main():
-    symbol = 'XBT/USD'  # Use valid Kraken symbol
+    symbol = 'XBTUSDT'  # Correct Kraken symbol
     timeframe = '1h'    # Use valid timeframe
     initial_balance = 1000
     
@@ -146,8 +137,6 @@ def main():
         for key, value in metrics.items():
             print(f"{key}: {value}")
 
-        # Plot results
-        plot_results(df, trade_log, equity_curve)
     except Exception as e:
         print(f"An error occurred: {e}")
 
