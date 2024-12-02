@@ -1,7 +1,6 @@
 import ccxt
 import time
 import logging
-import dontshare
 import dontshare as d
 
 # Set up logging
