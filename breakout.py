@@ -9,7 +9,6 @@ kraken = ccxt.kraken({
     'secret': d.SECRET_KEY,
 })
 
-# Fetch historical OHLCV data
 def fetch_ohlcv(symbol, timeframe='1h', limit=500):
     print(f"Fetching data for {symbol}...")
     try:
@@ -21,13 +20,11 @@ def fetch_ohlcv(symbol, timeframe='1h', limit=500):
         print(f"Error fetching OHLCV data: {e}")
         raise
 
-# Calculate relative volume (RVOL)
 def calculate_relative_volume(df):
     df['avg_volume'] = df['volume'].rolling(window=20).mean()
     df['rvol'] = df['volume'] / df['avg_volume']
     return df
 
-# Backtest strategy
 def backtest_strategy(df, rvol_threshold=3, initial_balance=1000, trade_amount=100, fee_rate=0.0025):
     balance = initial_balance
     position = 0
@@ -42,14 +39,12 @@ def backtest_strategy(df, rvol_threshold=3, initial_balance=1000, trade_amount=1
         current_rvol = df['rvol'].iloc[i]
         price = df['close'].iloc[i]
         
-        # Buy condition: RVOL > threshold and price increasing
         if current_rvol > rvol_threshold and position == 0 and df['close'].iloc[i] > df['close'].iloc[i - 1]:
             position = trade_amount / price
             balance -= trade_amount
             balance -= trade_amount * fee_rate  # Apply fee
             trade_log.append({'timestamp': df['timestamp'].iloc[i], 'type': 'buy', 'price': price, 'amount': position})
         
-        # Sell condition: RVOL > threshold and price decreasing
         elif current_rvol > rvol_threshold and position > 0 and df['close'].iloc[i] < df['close'].iloc[i - 1]:
             balance += position * price
             balance -= position * price * fee_rate  # Apply fee
@@ -58,7 +53,6 @@ def backtest_strategy(df, rvol_threshold=3, initial_balance=1000, trade_amount=1
 
         equity_curve.append(balance + (position * price if position > 0 else 0))
 
-    # Close position at the end
     if position > 0:
         balance += position * df['close'].iloc[-1]
         balance -= position * df['close'].iloc[-1] * fee_rate
@@ -67,12 +61,10 @@ def backtest_strategy(df, rvol_threshold=3, initial_balance=1000, trade_amount=1
 
     return balance, pd.DataFrame(trade_log), equity_curve
 
-# Calculate metrics
 def calculate_metrics(trade_log, equity_curve, initial_balance):
     buy_trades = trade_log[trade_log['type'] == 'buy']
     sell_trades = trade_log[trade_log['type'] == 'sell']
 
-    # Metrics
     gains = []
     losses = []
     for i in range(len(sell_trades)):
@@ -88,7 +80,6 @@ def calculate_metrics(trade_log, equity_curve, initial_balance):
     wins = len(gains)
     losses_count = len(losses)
 
-    # Max drawdown as a negative value
     peak_equity = max(equity_curve)
     trough_equity = min(equity_curve)
     max_drawdown = (trough_equity - peak_equity) / peak_equity * 100
@@ -116,29 +107,35 @@ def calculate_metrics(trade_log, equity_curve, initial_balance):
         'calmar_ratio': calmar_ratio
     }
 
+def has_not_increased_significantly(df, threshold=0.1):
+    initial_price = df['close'].iloc[0]
+    final_price = df['close'].iloc[-1]
+    price_increase = (final_price - initial_price) / initial_price
+    return price_increase < threshold
 
-# Main execution
 def main():
-    symbol = 'XBTUSDT'  # Correct Kraken symbol
-    timeframe = '1h'    # Use valid timeframe
+    symbols = ['XBTUSDT', 'ETHUSDT', 'LTCUSDT', 'SOLUSDT']  # Add more symbols as needed
+    timeframe = '1h'
     initial_balance = 1000
-    
-    try:
-        # Fetch historical data
-        df = fetch_ohlcv(symbol, timeframe)
-        df = calculate_relative_volume(df)
+    threshold = 0.1  # 10% increase threshold
 
-        # Backtest the strategy
-        final_balance, trade_log, equity_curve = backtest_strategy(df, initial_balance=initial_balance)
+    for symbol in symbols:
+        try:
+            df = fetch_ohlcv(symbol, timeframe)
+            df = calculate_relative_volume(df)
 
-        # Calculate metrics
-        metrics = calculate_metrics(trade_log, equity_curve, initial_balance)
-        print("Metrics:")
-        for key, value in metrics.items():
-            print(f"{key}: {value}")
+            if has_not_increased_significantly(df, threshold):
+                final_balance, trade_log, equity_curve = backtest_strategy(df, initial_balance=initial_balance)
+                metrics = calculate_metrics(trade_log, equity_curve, initial_balance)
+                print(f"Metrics for {symbol}:")
+                for key, value in metrics.items():
+                    print(f"{key}: {value}")
+                print("\n")
+            else:
+                print(f"{symbol} has increased significantly in price, skipping...\n")
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        except Exception as e:
+            print(f"An error occurred for {symbol}: {e}")
 
 if __name__ == "__main__":
     main()
