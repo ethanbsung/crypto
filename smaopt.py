@@ -55,10 +55,10 @@ print("Optimization is starting...")
 
 # Optimization
 stats = bt.optimize(
-    window_short=range(5, 20, 1),
-    window_long=range(20, 50, 1),
+    window_short=range(5, 20, 5),
+    window_long=range(20, 50, 5),
     stoploss_multiple=[0.01, 0.02, 0.03],
-    risk_reward_ratio=[3, 4, 5, 6],
+    risk_reward_ratio=[2, 3, 4, 5],
     maximize='Equity Final [$]'
 )
 

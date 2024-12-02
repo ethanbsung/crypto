@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class TradingConfig:
-    # Strategy parameters
+    # Strategy parameters (matching backtest)
     adx_period = 10
     adx_low = 26
     adx_high = 32
@@ -31,20 +31,18 @@ class TradingConfig:
     
     # Trading parameters
     trade_amount_usd = 1
-    timeframe = '30m'
+    timeframe = '4h'
     symbol = 'ETH/USD'
     max_slippage = 0.002  # 0.2% maximum allowed slippage
     order_timeout = 60    # seconds to wait for order to fill
     
     # Risk management
-    max_daily_loss_usd = 5  # Maximum daily loss in USD
+    max_daily_loss_usd = 5
     max_trades_per_day = 10
     minimum_usd_balance = 10
-    panic_drop_pct = 0.10  # 10% sudden price drop triggers panic mode
     
     # Technical parameters
     min_data_points = 20
-    health_check_interval = 300  # 5 minutes
 
 class TradeState:
     def __init__(self):
@@ -57,8 +55,6 @@ class TradeState:
         self.daily_trades = 0
         self.last_trade_time = None
         self.last_reset_time = datetime.now()
-        self.is_panic_mode = False
-        self.last_health_check = datetime.now()
 
 class TradingBot:
     def __init__(self):
@@ -68,7 +64,6 @@ class TradingBot:
             'enableRateLimit': True,
         })
         self.trade_state = TradeState()
-        self.last_known_price = None
         self.running = True
         
         # Set up signal handlers
@@ -79,41 +74,14 @@ class TradingBot:
         logger.info("Shutdown signal received. Cleaning up...")
         self.running = False
         self.close_all_positions()
-        sys.exit(0)
+        self.running = False
 
     def reset_daily_metrics(self):
-        if (datetime.now() - self.trade_state.last_reset_time).days >= 1:
+        if datetime.now().date() != self.trade_state.last_reset_time.date():
             self.trade_state.daily_loss = 0
             self.trade_state.daily_trades = 0
             self.trade_state.last_reset_time = datetime.now()
             logger.info("Daily metrics reset")
-
-    def check_system_health(self) -> bool:
-        try:
-            if (datetime.now() - self.trade_state.last_health_check).seconds >= TradingConfig.health_check_interval:
-                # Check exchange connection
-                self.exchange.fetch_ticker(TradingConfig.symbol)
-                
-                # Check balance
-                balance = self.exchange.fetch_balance()
-                usd_balance = float(balance['free'].get('USD', 0))
-                
-                if usd_balance < TradingConfig.minimum_usd_balance:
-                    raise Exception(f"Balance too low: ${usd_balance}")
-                
-                # Check if we can fetch recent data
-                data = self.fetch_data()
-                if data is None or len(data) < TradingConfig.min_data_points:
-                    raise Exception("Unable to fetch sufficient market data")
-                
-                self.trade_state.last_health_check = datetime.now()
-                return True
-                
-        except Exception as e:
-            logger.error(f"Health check failed: {e}")
-            return False
-        
-        return True
 
     def fetch_data(self) -> Optional[pd.DataFrame]:
         try:
@@ -122,10 +90,35 @@ class TradingBot:
                 timeframe=TradingConfig.timeframe,
                 limit=100
             )
+            
+            # Validate OHLCV data exists
+            if not ohlcv or len(ohlcv) < TradingConfig.min_data_points:
+                logger.error(f"Invalid data: Insufficient data points ({len(ohlcv) if ohlcv else 0})")
+                return None
+
             df = pd.DataFrame(
                 ohlcv,
                 columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
             )
+            
+            # Check for missing values
+            if df.isnull().any().any():
+                logger.error("Invalid data: Missing values detected")
+                return None
+            
+            # Validate OHLC relationships
+            invalid_candles = (
+                (df['high'] < df['low']) | 
+                (df['high'] < df['open']) | 
+                (df['high'] < df['close']) |
+                (df['low'] > df['open']) | 
+                (df['low'] > df['close'])
+            )
+            if invalid_candles.any():
+                logger.error(f"Invalid data: Detected {invalid_candles.sum()} candles with invalid OHLC relationships")
+                return None
+
+            # Validate timestamps are sequential
             df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('datetime', inplace=True)
             return df
@@ -133,37 +126,20 @@ class TradingBot:
             logger.error(f"Error fetching data: {e}")
             return None
 
-    def check_panic_mode(self, current_price: float) -> bool:
-        if self.last_known_price is None:
-            self.last_known_price = current_price
-            return False
-        
-        price_change = (current_price - self.last_known_price) / self.last_known_price
-        self.last_known_price = current_price
-        
-        if abs(price_change) > TradingConfig.panic_drop_pct:
-            logger.warning(f"PANIC MODE: Price changed by {price_change:.2%}")
-            self.trade_state.is_panic_mode = True
-            self.close_all_positions()
-            return True
-            
-        return False
-
     def close_all_positions(self):
         try:
-            positions = self.exchange.fetch_positions()
-            for position in positions:
-                if position['symbol'] == TradingConfig.symbol:
-                    self.exchange.create_market_order(
-                        symbol=TradingConfig.symbol,
-                        type='market',
-                        side='sell' if position['side'] == 'buy' else 'buy',
-                        amount=abs(float(position['contracts']))
-                    )
-            self.trade_state.in_trade = False
-            logger.info("All positions closed")
+            # Only close position if we're in a trade that this strategy opened
+            if self.trade_state.in_trade:
+                self.exchange.create_market_order(
+                    symbol=TradingConfig.symbol,
+                    type='market',
+                    side='sell' if self.trade_state.current_position == 'buy' else 'buy',
+                    amount=abs(float(self.trade_amount_usd / self.trade_state.entry_price))
+                )
+                self.trade_state.in_trade = False
+                logger.info("Strategy position closed")
         except Exception as e:
-            logger.error(f"Error closing positions: {e}")
+            logger.error(f"Error closing position: {e}")
 
     def execute_trade(self, side: str, price: float) -> bool:
         try:
@@ -171,11 +147,6 @@ class TradingBot:
             if (self.trade_state.daily_loss >= TradingConfig.max_daily_loss_usd or 
                 self.trade_state.daily_trades >= TradingConfig.max_trades_per_day):
                 logger.info("Daily limits reached, skipping trade")
-                return False
-
-            # Check for panic mode
-            if self.trade_state.is_panic_mode:
-                logger.info("In panic mode, skipping trade")
                 return False
 
             # Slippage check
@@ -189,9 +160,9 @@ class TradingBot:
 
             # Calculate position size
             eth_amount = TradingConfig.trade_amount_usd / price
-            eth_amount = round(eth_amount, 8)
+            eth_amount = round(eth_amount, 8)  # Kraken requires 8 decimal places for ETH
 
-            # Calculate stop loss and take profit
+            # Calculate stop loss and take profit prices
             if side == 'buy':
                 stop_loss = price * (1 - TradingConfig.stop_loss_pct)
                 take_profit = price * (1 + TradingConfig.stop_loss_pct * TradingConfig.risk_reward_ratio)
@@ -199,8 +170,8 @@ class TradingBot:
                 stop_loss = price * (1 + TradingConfig.stop_loss_pct)
                 take_profit = price * (1 - TradingConfig.stop_loss_pct * TradingConfig.risk_reward_ratio)
 
-            # Place the order
-            order = self.exchange.create_order(
+            # Place the entry order
+            entry_order = self.exchange.create_order(
                 symbol=TradingConfig.symbol,
                 type='limit',
                 side=side,
@@ -208,11 +179,30 @@ class TradingBot:
                 price=price
             )
 
-            # Monitor order
+            # Monitor entry order
             start_time = time.time()
             while time.time() - start_time < TradingConfig.order_timeout:
-                order_status = self.exchange.fetch_order(order['id'])
+                order_status = self.exchange.fetch_order(entry_order['id'])
                 if order_status['status'] == 'closed':
+                    # Place stop loss order
+                    stop_loss_order = self.exchange.create_order(
+                        symbol=TradingConfig.symbol,
+                        type='stop',
+                        side='sell' if side == 'buy' else 'buy',
+                        amount=eth_amount,
+                        price=stop_loss,
+                        params={'stopLoss': stop_loss}
+                    )
+
+                    # Place take profit order
+                    take_profit_order = self.exchange.create_order(
+                        symbol=TradingConfig.symbol,
+                        type='limit',
+                        side='sell' if side == 'buy' else 'buy',
+                        amount=eth_amount,
+                        price=take_profit
+                    )
+
                     # Update trade state
                     self.trade_state.in_trade = True
                     self.trade_state.current_position = side
@@ -233,7 +223,7 @@ class TradingBot:
 
             # Cancel order if not filled
             if order_status['status'] != 'closed':
-                self.exchange.cancel_order(order['id'])
+                self.exchange.cancel_order(entry_order['id'])
                 logger.warning("Order cancelled due to timeout")
                 return False
 
@@ -242,13 +232,6 @@ class TradingBot:
             return False
 
     def run_strategy(self):
-        # Basic health check
-        if not self.check_system_health():
-            return
-
-        # Reset daily metrics if needed
-        self.reset_daily_metrics()
-
         # Fetch and validate data
         df = self.fetch_data()
         if df is None or len(df) < TradingConfig.min_data_points:
@@ -256,10 +239,6 @@ class TradingBot:
             return
 
         current_price = df['close'].iloc[-1]
-        
-        # Check for panic conditions
-        if self.check_panic_mode(current_price):
-            return
 
         # Position management
         try:
@@ -271,6 +250,10 @@ class TradingBot:
                         self.close_all_positions()
                         pnl = (current_price - self.trade_state.entry_price) * TradingConfig.trade_amount_usd
                         self.trade_state.daily_loss -= min(pnl, 0)
+                        logger.info(
+                            f"Position closed - Exit: ${current_price:.2f}, "
+                            f"PnL: ${pnl:.2f} ({'Stop Loss' if current_price <= self.trade_state.stop_loss else 'Take Profit'})"
+                        )
                 else:  # sell position
                     if (current_price >= self.trade_state.stop_loss or 
                         current_price <= self.trade_state.take_profit):
@@ -282,7 +265,7 @@ class TradingBot:
             logger.error(f"Error in position management: {e}")
             return
 
-        # Calculate ADX
+        # Calculate ADX (matching backtest)
         adx = ADXIndicator(
             df['high'],
             df['low'],
@@ -292,7 +275,7 @@ class TradingBot:
 
         current_adx = adx.iloc[-1]
 
-        # Check trading conditions
+        # Check trading conditions (matching backtest)
         if TradingConfig.adx_low < current_adx < TradingConfig.adx_high:
             if crossover(df['close'], df['high'].shift(2)):
                 self.execute_trade('buy', current_price)
@@ -321,14 +304,10 @@ class TradingBot:
                 logger.info(f"Checking for trade opportunities... {current_time}")
                 self.run_strategy()
                 
-                # Sleep until next candle
-                sleep_until = current_time.replace(second=0, microsecond=0)
-                if TradingConfig.timeframe == '30m':
-                    if current_time.minute >= 30:
-                        sleep_until = sleep_until.replace(minute=30)
-                    else:
-                        sleep_until = sleep_until.replace(minute=0)
-                    sleep_until += pd.Timedelta(minutes=30)
+                # Sleep until next 4h candle
+                sleep_until = current_time.replace(minute=0, second=0, microsecond=0)
+                while sleep_until <= current_time:
+                    sleep_until = sleep_until + pd.Timedelta(hours=4)
                 
                 sleep_seconds = (sleep_until - current_time).total_seconds()
                 if sleep_seconds > 0:
