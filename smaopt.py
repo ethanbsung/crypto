@@ -39,7 +39,7 @@ class SMAStrategy(Strategy):
             self.position.close()
             self.in_trade = False
 
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_30.csv')
+data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_30.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
