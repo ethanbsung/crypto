@@ -1,41 +1,82 @@
 import ccxt
 import time
 import dontshare as d
+import logging
+from datetime import datetime
 
-# Initialize Kraken exchange
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('positions.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Initialize Kraken exchange with rate limiting enabled
 kraken = ccxt.kraken({
     'apiKey': d.kraken_api_key,
     'secret': d.kraken_secret_key,
+    'enableRateLimit': True,  # Enable built-in rate limiting
 })
 
 def print_account_balance():
     try:
+        # Use fetch_balance() for spot balances
         balance = kraken.fetch_balance()
         usd_balance = balance['total'].get('USD', 0)
-        print(f"USD Balance: {usd_balance}")
+        logger.info(f"USD Balance: {usd_balance}")
+    except ccxt.AuthenticationError as e:
+        logger.error(f"Authentication error: {str(e)}")
+    except ccxt.RateLimitExceeded as e:
+        logger.error(f"Rate limit exceeded: {str(e)}")
+        time.sleep(60)  # Wait a minute if rate limited
     except Exception as e:
-        print(f"Error fetching balance: {e}")
+        logger.error(f"Error fetching balance: {str(e)}")
 
 def print_open_positions():
     try:
-        # Fetch open positions
         positions = kraken.fetch_positions()
         if positions:
-            print("Open Positions:")
+            logger.info("Open Positions:")
             for position in positions:
-                print(f"Symbol: {position['symbol']}, Amount: {position['amount']}, Side: {position['side']}")
+                logger.info(f"Symbol: {position['symbol']}, Amount: {position['amount']}, Side: {position['side']}")
         else:
-            print("No open positions.")
+            logger.info("No open positions.")
+    except ccxt.AuthenticationError as e:
+        logger.error(f"Authentication error: {str(e)}")
+    except ccxt.RateLimitExceeded as e:
+        logger.error(f"Rate limit exceeded: {str(e)}")
+        time.sleep(60)  # Wait a minute if rate limited
     except Exception as e:
-        print(f"Error fetching positions: {e}")
+        logger.error(f"Error fetching positions: {str(e)}")
 
 def risk_manager():
+    logger.info("Risk manager started")
+    
     while True:
-        print("Checking account status...")
-        print_account_balance()
-        print_open_positions()
-        print("Next update in 15 minutes...\n")
-        time.sleep(900)  # Sleep for 900 seconds (15 minutes)
+        try:
+            current_time = datetime.now()
+            logger.info(f"\nChecking account status at {current_time}...")
+            
+            print_account_balance()
+            time.sleep(2)  # Add small delay between API calls
+            print_open_positions()
+            
+            logger.info("Next update in 15 minutes...")
+            time.sleep(900)  # Sleep for 900 seconds (15 minutes)
+            
+        except Exception as e:
+            logger.error(f"Error in risk manager: {str(e)}")
+            time.sleep(60)  # Wait a minute before retrying
 
 if __name__ == "__main__":
-    risk_manager()
+    try:
+        # Test API connection first
+        kraken.fetch_balance()
+        logger.info("API connection successful")
+        risk_manager()
+    except Exception as e:
+        logger.error(f"Failed to start risk manager: {str(e)}")

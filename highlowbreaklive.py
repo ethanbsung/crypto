@@ -65,16 +65,21 @@ class TradingBot:
         })
         self.trade_state = TradeState()
         self.running = True
+        self.is_shutting_down = False
         
         # Set up signal handlers
         signal.signal(signal.SIGINT, self.handle_shutdown)
         signal.signal(signal.SIGTERM, self.handle_shutdown)
 
     def handle_shutdown(self, signum, frame):
+        if self.is_shutting_down:
+            return
+            
+        self.is_shutting_down = True
         logger.info("Shutdown signal received. Cleaning up...")
         self.running = False
         self.close_all_positions()
-        self.running = False
+        sys.exit(0)
 
     def reset_daily_metrics(self):
         if datetime.now().date() != self.trade_state.last_reset_time.date():
@@ -85,10 +90,11 @@ class TradingBot:
 
     def fetch_data(self) -> Optional[pd.DataFrame]:
         try:
+            # Fetch one extra candle to ensure we have the latest complete one
             ohlcv = self.exchange.fetch_ohlcv(
                 TradingConfig.symbol,
                 timeframe=TradingConfig.timeframe,
-                limit=100
+                limit=101  # Fetch 101 instead of 100
             )
             
             # Validate OHLCV data exists
@@ -122,8 +128,14 @@ class TradingBot:
             df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('datetime', inplace=True)
             return df
+        except ccxt.NetworkError as e:
+            logger.error(f"Network error when fetching data: {str(e)}")
+            return None
+        except ccxt.ExchangeError as e:
+            logger.error(f"Exchange error when fetching data: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"Error fetching data: {e}")
+            logger.error(f"Unexpected error fetching data: {str(e)}")
             return None
 
     def close_all_positions(self):
