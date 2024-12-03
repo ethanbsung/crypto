@@ -64,10 +64,21 @@ def risk_manager():
     
     while True:
         try:
+            # Add a few retries for waking up the API
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    kraken.fetch_time()  # Wake up API connection
+                    break  # If successful, exit retry loop
+                except Exception as e:
+                    if attempt == max_retries - 1:  # If last attempt
+                        raise  # Re-raise the exception
+                    logger.warning(f"Failed to wake API (attempt {attempt + 1}/{max_retries}), retrying...")
+                    time.sleep(5)  # Wait 5 seconds between retries
+            
             current_time = datetime.now()
             logger.info(f"\nChecking account status at {current_time}...")
-
-            kraken.fetch_time()  # Ping the API to wake up the session
+            
             time.sleep(2)  # Add small delay between API calls
             print_account_balance()
             time.sleep(2)  # Add small delay between API calls
