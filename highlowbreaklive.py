@@ -313,17 +313,32 @@ class TradingBot:
         while self.running:
             try:
                 current_time = datetime.now()
-                logger.info(f"Checking for trade opportunities... {current_time}")
-                self.run_strategy()
                 
-                # Sleep until next 4h candle
+                # Calculate sleep time until next candle
                 sleep_until = current_time.replace(minute=0, second=0, microsecond=0)
                 while sleep_until <= current_time:
                     sleep_until = sleep_until + pd.Timedelta(hours=4)
                 
                 sleep_seconds = (sleep_until - current_time).total_seconds()
-                if sleep_seconds > 0:
-                    time.sleep(sleep_seconds)
+                
+                if sleep_seconds > 60:  # If more than a minute until next candle
+                    time.sleep(sleep_seconds - 60)  # Wake up 1 minute early
+                    # Wake up API with retries
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            self.exchange.fetch_time()  # Wake up API connection
+                            break
+                        except Exception as e:
+                            if attempt == max_retries - 1:
+                                logger.error(f"Failed to wake API after {max_retries} attempts")
+                            else:
+                                logger.warning(f"Failed to wake API (attempt {attempt + 1}/{max_retries}), retrying...")
+                                time.sleep(5)
+                    time.sleep(55)  # Sleep remaining time until candle close
+                
+                logger.info(f"Checking for trade opportunities... {current_time}")
+                self.run_strategy()
                 
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
