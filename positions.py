@@ -66,14 +66,15 @@ def risk_manager():
         try:
             current_time = datetime.now()
             logger.info(f"\nChecking account status at {current_time}...")
-            
-            kraken.public_get('Time')  # Ping the API to wake up the session
+
+            kraken.fetch_time()  # Ping the API to wake up the session
+            time.sleep(2)  # Add small delay between API calls
             print_account_balance()
             time.sleep(2)  # Add small delay between API calls
             print_open_positions()
             
             logger.info("Next update in 15 minutes...")
-            time.sleep(60)  # Sleep for 900 seconds (15 minutes)
+            time.sleep(900)  # Sleep for 900 seconds (15 minutes)
             
         except Exception as e:
             logger.error(f"Error in risk manager: {str(e)}")
