@@ -4,10 +4,10 @@ import pandas as pd
 
 class SMAStrategy(Strategy):
     def init(self):
-        self.window_short = 13
-        self.window_long = 32
-        self.stoploss_multiple = 0.02
-        self.risk_reward_ratio = 5
+        self.window_short = 10
+        self.window_long = 45
+        self.stoploss_multiple = 0.01
+        self.risk_reward_ratio = 3
         self.in_trade = False
 
     def calculate_sma(self, close_prices, window):
@@ -34,7 +34,7 @@ class SMAStrategy(Strategy):
             self.position.close()
             self.in_trade = False
 
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_30.csv')
+data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_30.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
