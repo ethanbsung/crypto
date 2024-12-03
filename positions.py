@@ -24,17 +24,24 @@ kraken = ccxt.kraken({
 
 def print_account_balance():
     try:
-        # Use fetch_balance() for spot balances
-        balance = kraken.fetch_balance()
-        usd_balance = balance['total'].get('USD', 0)
-        logger.info(f"USD Balance: {usd_balance}")
+        logger.info("Attempting to fetch balance...")
+        balance = kraken.privatePostBalance()
+        if 'result' in balance:
+            usd_balance = float(balance['result'].get('ZUSD', 0))
+            logger.info(f"USD Balance: {usd_balance}")
+        else:
+            logger.error(f"Unexpected balance response: {balance}")
     except ccxt.AuthenticationError as e:
         logger.error(f"Authentication error: {str(e)}")
     except ccxt.RateLimitExceeded as e:
         logger.error(f"Rate limit exceeded: {str(e)}")
-        time.sleep(60)  # Wait a minute if rate limited
+        time.sleep(60)
+    except ccxt.NetworkError as e:
+        logger.error(f"Network error: {str(e)}")
+        time.sleep(5)
     except Exception as e:
         logger.error(f"Error fetching balance: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
 
 def print_open_positions():
     try:
@@ -75,7 +82,7 @@ def risk_manager():
 if __name__ == "__main__":
     try:
         # Test API connection first
-        kraken.fetch_balance()
+        kraken.privatePostBalance()
         logger.info("API connection successful")
         risk_manager()
     except Exception as e:
