@@ -19,29 +19,28 @@ logger = logging.getLogger(__name__)
 kraken = ccxt.kraken({
     'apiKey': d.kraken_api_key,
     'secret': d.kraken_secret_key,
-    'enableRateLimit': True,  # Enable built-in rate limiting
+    'enableRateLimit': True,
 })
+
 
 def print_account_balance():
     try:
+        
         logger.info("Attempting to fetch balance...")
-        balance = kraken.privatePostBalance()
-        if 'result' in balance:
-            usd_balance = float(balance['result'].get('ZUSD', 0))
-            logger.info(f"USD Balance: {usd_balance}")
-        else:
-            logger.error(f"Unexpected balance response: {balance}")
+        balance = kraken.fetch_balance({'type': 'spot'})
+        usd_balance = balance['total'].get('USD', 0)
+        logger.info(f"USD Balance: {usd_balance}")
     except ccxt.AuthenticationError as e:
         logger.error(f"Authentication error: {str(e)}")
     except ccxt.RateLimitExceeded as e:
         logger.error(f"Rate limit exceeded: {str(e)}")
-        time.sleep(60)
+        time.sleep(60)  # Wait a minute if rate limited
     except ccxt.NetworkError as e:
         logger.error(f"Network error: {str(e)}")
-        time.sleep(5)
+        time.sleep(5)  # Wait 5 seconds before retry on network error
     except Exception as e:
         logger.error(f"Error fetching balance: {str(e)}")
-        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error type: {type(e)}")  # Log the error type
 
 def print_open_positions():
     try:
@@ -68,12 +67,13 @@ def risk_manager():
             current_time = datetime.now()
             logger.info(f"\nChecking account status at {current_time}...")
             
+            kraken.public_get('Time')  # Ping the API to wake up the session
             print_account_balance()
             time.sleep(2)  # Add small delay between API calls
             print_open_positions()
             
             logger.info("Next update in 15 minutes...")
-            time.sleep(900)  # Sleep for 900 seconds (15 minutes)
+            time.sleep(60)  # Sleep for 900 seconds (15 minutes)
             
         except Exception as e:
             logger.error(f"Error in risk manager: {str(e)}")
@@ -82,7 +82,7 @@ def risk_manager():
 if __name__ == "__main__":
     try:
         # Test API connection first
-        kraken.privatePostBalance()
+        kraken.fetch_balance()
         logger.info("API connection successful")
         risk_manager()
     except Exception as e:
