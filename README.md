@@ -13,6 +13,7 @@ Market making trading algorithm to trade the bid/ask spread for profit. TBD whic
 Use python to determine Bitcoin market regimes over the past 5 years by training an HMM model
 
 Use python to connect to trader's wallets that have outperformed the market. I do this by connecting to the platform BirdEye using an API.
+BirdEye API is $200/month. This bot will need to wait.
 
 Strategies:
 Average directional index strategy - use the average directional index to determine the trend of the market.
