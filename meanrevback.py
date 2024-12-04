@@ -31,5 +31,5 @@ PYTH/USD
 
 '''
 symbols = ['SOL/USD', 'TON/USD', 'PEPE/USD', 'CRO/USD', 'TAO/USD', 'KAS/USD', 'TIA/USD', 'WIF/USD', 'BONK/USD', 'FLOKI/USD', 'POPCAT/USD']
-timeframe = '5m'
+timeframe = '1h'
 

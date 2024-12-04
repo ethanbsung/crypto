@@ -41,7 +41,6 @@ class TradingConfig:
     
     # Risk management
     max_daily_loss_usd = 5
-    max_trades_per_day = 10
     minimum_usd_balance = 10
     
     # Technical parameters
@@ -159,8 +158,7 @@ class TradingBot:
     def execute_trade(self, side: str, price: float) -> bool:
         try:
             # Check daily limits
-            if (self.trade_state.daily_loss >= TradingConfig.max_daily_loss_usd or 
-                self.trade_state.daily_trades >= TradingConfig.max_trades_per_day):
+            if (self.trade_state.daily_loss >= TradingConfig.max_daily_loss_usd):
                 logger.info("Daily limits reached, skipping trade")
                 return False
 
