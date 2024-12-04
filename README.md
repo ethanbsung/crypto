@@ -1,10 +1,18 @@
-This is a repository containing trading algorithms I am creating in the cryptocurrency space. 
+This is a repository containing trading algorithms I am creating in the cryptocurrency space.
 
-I am using python to determine Bitcoin market regimes over the past 5 years by training an HMM model
+I am running a strategy on ETH/USD on Kraken using the ADX indicator on the 4h timeframe. This strategy returned 158% from 2024-01-01 to 2024-09-30. I am now testing it live with very small size.
 
-I am using python to connect to trader's wallets that have outperformed the market. I do this by connecting to the platform BirdEye using an API.
+I am coding a mean reversion strategy on a number of coins on Kraken that do not tend to trend. I am in the process of determining the best parameters and will begin to backtest it soon.
 
-I am also creating a trading algorithm to trade the current crypto bull run progammatically. I will be creating various strategies that I believe will generate me positive returns. Here I will be brainstorming strategies that I believe will give me the returns I am looking for.
+Along with the mean reversion strategy, I am coding a trend following strategy that will take advantage of coins in the current crypto bull run.
+
+
+Plan to continue / do next:
+Market making trading algorithm to trade the bid/ask spread for profit. TBD which coins I will trade.
+
+Use python to determine Bitcoin market regimes over the past 5 years by training an HMM model
+
+Use python to connect to trader's wallets that have outperformed the market. I do this by connecting to the platform BirdEye using an API.
 
 Strategies:
 Average directional index strategy - use the average directional index to determine the trend of the market.
