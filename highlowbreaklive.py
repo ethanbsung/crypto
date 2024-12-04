@@ -199,11 +199,10 @@ class TradingBot:
                     # Place stop loss order
                     stop_loss_order = self.exchange.create_order(
                         symbol=TradingConfig.symbol,
-                        type='stop',
+                        type='stop-loss',
                         side='sell' if side == 'buy' else 'buy',
                         amount=eth_amount,
                         price=stop_loss,
-                        params={'stopLoss': stop_loss}
                     )
 
                     # Place take profit order
@@ -255,24 +254,12 @@ class TradingBot:
         # Position management
         try:
             if self.trade_state.in_trade:
-                # Check for stop loss or take profit
-                if self.trade_state.current_position == 'buy':
-                    if (current_price <= self.trade_state.stop_loss or 
-                        current_price >= self.trade_state.take_profit):
-                        self.close_all_positions()
-                        pnl = (current_price - self.trade_state.entry_price) * TradingConfig.trade_amount_usd
-                        self.trade_state.daily_loss -= min(pnl, 0)
-                        logger.info(
-                            f"Position closed - Exit: ${current_price:.2f}, "
-                            f"PnL: ${pnl:.2f} ({'Stop Loss' if current_price <= self.trade_state.stop_loss else 'Take Profit'})"
-                        )
-                else:  # sell position
-                    if (current_price >= self.trade_state.stop_loss or 
-                        current_price <= self.trade_state.take_profit):
-                        self.close_all_positions()
-                        pnl = (self.trade_state.entry_price - current_price) * TradingConfig.trade_amount_usd
-                        self.trade_state.daily_loss -= min(pnl, 0)
-                return
+                # Check if position was closed by exchange-side orders
+                position = self.exchange.fetch_position(TradingConfig.symbol)
+                if position['size'] == 0:  # Position was closed
+                    self.trade_state.in_trade = False
+                    logger.info(f"Position closed by exchange orders")
+                    return
         except Exception as e:
             logger.error(f"Error in position management: {e}")
             return
