@@ -6,3 +6,19 @@ Checking account status at 2024-12-03 23:26:29.058895...
 2024-12-03 23:26:31,972 - INFO - USD Balance: 250.0
 2024-12-03 23:26:35,194 - INFO - No open positions.
 2024-12-03 23:26:35,194 - INFO - Next update in 15 minutes...
+2024-12-05 16:05:05,156 - ERROR - Failed to start risk manager: binance GET https://api.binance.com/sapi/v1/capital/config/getall?timestamp=1733432705013&recvWindow=10000&signature=c0af795e04fbde0be5e3e0d47c82decaf5a1718711e92200b4b01932b35686ed 451  {
+  "code": 0,
+  "msg": "Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms. Please contact customer service if you believe you received this message in error."
+}
+2024-12-05 16:07:00,754 - ERROR - Failed to start risk manager: binance GET https://api.binance.com/sapi/v1/capital/config/getall?timestamp=1733432820592&recvWindow=10000&signature=71ed3aab9736d7779faf651cda3d1ca45dea32697f4387ac98d83dbe9795df91 451  {
+  "code": 0,
+  "msg": "Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms. Please contact customer service if you believe you received this message in error."
+}
+2024-12-05 16:13:41,652 - INFO - API connection successful
+2024-12-05 16:13:41,652 - INFO - Risk manager started
+2024-12-05 16:13:42,637 - INFO - 
+Checking account status at 2024-12-05 16:13:42.637845...
+2024-12-05 16:13:44,639 - INFO - Attempting to fetch balance...
+2024-12-05 16:13:45,717 - INFO - USD Balance: 249.9652
+2024-12-05 16:13:48,656 - INFO - No open positions.
+2024-12-05 16:13:48,657 - INFO - Next update in 15 minutes...

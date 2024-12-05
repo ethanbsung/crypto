@@ -33,7 +33,7 @@ class TradingConfig:
     stop_loss_pct = 0.03
     
     # Trading parameters
-    trade_amount_usd = 1
+    trade_amount_eth = 0.002  # Fixed amount of ETH to trade
     timeframe = '4h'
     symbol = 'ETH/USD'
     max_slippage = 0.002  # 0.2% maximum allowed slippage
@@ -171,9 +171,8 @@ class TradingBot:
                 logger.warning(f"Price slippage too high: {price_diff:.2%}")
                 return False
 
-            # Calculate position size
-            eth_amount = TradingConfig.trade_amount_usd / price
-            eth_amount = round(eth_amount, 8)  # Kraken requires 8 decimal places for ETH
+            # Use fixed ETH amount
+            eth_amount = TradingConfig.trade_amount_eth
 
             # Calculate stop loss and take profit prices
             if side == 'buy':
@@ -226,7 +225,7 @@ class TradingBot:
 
                     logger.info(
                         f"{side.upper()} order executed - "
-                        f"Amount: {eth_amount} ETH (${TradingConfig.trade_amount_usd}), "
+                        f"Amount: {eth_amount} ETH, "
                         f"Entry: ${price:.2f}, SL: ${stop_loss:.2f}, TP: ${take_profit:.2f}"
                     )
                     return True
@@ -285,7 +284,7 @@ class TradingBot:
     def run(self):
         logger.info(f"Bot started! Running strategy on {TradingConfig.symbol}")
         logger.info(f"Timeframe: {TradingConfig.timeframe}")
-        logger.info(f"Trade amount: ${TradingConfig.trade_amount_usd}")
+        logger.info(f"Trade amount: {TradingConfig.trade_amount_eth} ETH")
         
         # Initial balance check
         try:
