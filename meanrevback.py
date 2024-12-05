@@ -30,8 +30,22 @@ RENDER/USD
 PYTH/USD
 
 '''
-symbols = ['WIF/USD','POPCAT/USD']
-timeframe = '1h'
+symbols_data = {
+    'WIF/USD': {
+        'buy_range': (14, 15),
+        'sell_range': (14, 22)
+    },
+    'POPCAT/USD': {
+        'buy_range': (10, 12),
+        'sell_range': (18, 20)
+    }
+}
+def get_ranges(symbol):
+    return symbols_data.get(symbol, {'buy_range': (0, 0), 'sell_range': (0, 0)})
 
+symbol = 'WIF/USD'
+ranges = get_ranges(symbol)
+buy_range = ranges['buy_range']
+sell_range = ranges['sell_range']
 
 
