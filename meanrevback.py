@@ -30,6 +30,8 @@ RENDER/USD
 PYTH/USD
 
 '''
-symbols = ['SOL/USD', 'TON/USD', 'PEPE/USD', 'CRO/USD', 'TAO/USD', 'KAS/USD', 'TIA/USD', 'WIF/USD', 'BONK/USD', 'FLOKI/USD', 'POPCAT/USD']
+symbols = ['WIF/USD','POPCAT/USD']
 timeframe = '1h'
+
+
 
