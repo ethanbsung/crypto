@@ -3,13 +3,113 @@ import numpy as np
 import dontshare as d
 import time
 import ccxt
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import requests
+import csv
+
 
 kraken = ccxt.kraken({
     'apiKey': d.kraken_api_key,
     'secret': d.kraken_secret_key,
     'enableRateLimit': True,
 })
+
+def fetch_ohlcv(symbol: str, api_key: str, timeframe: str, start_date: str):
+    """
+    Fetches OHLCV data for a specified symbol, timeframe, and start date from CoinAPI,
+    calculates support and resistance, and saves the data to a CSV file.
+
+    Parameters:
+        symbol (str): The trading symbol (e.g., "BINANCE_SPOT_ETH_BTC").
+        api_key (str): Your CoinAPI API key.
+        timeframe (str): The time period for OHLCV data (e.g., "1HRS", "1DAY").
+        start_date (str): The start date in ISO 8601 format (e.g., "2023-03-01T00:00:00").
+
+    Returns:
+        None
+    """
+    # Define the API request details
+    url = f"https://rest.coinapi.io/v1/ohlcv/{symbol}/history?period_id={timeframe}&time_start={start_date}"
+    headers = {"X-CoinAPI-Key": api_key}  # Pass the API key dynamically
+
+    # Make the API request
+    response = requests.get(url, headers=headers)
+
+    # Check if the response is successful
+    if response.status_code == 200:
+        if response.content:
+            # Parse the JSON response
+            data = response.json()
+
+            # Prepare the output CSV file
+            filename = f"{symbol}_{timeframe}.csv"
+
+            # Initialize lists for resistance and support
+            resistance_levels = []
+            support_levels = []
+
+            # Calculate resistance and support dynamically
+            for i in range(len(data)):
+                # Consider data up to the current point
+                past_data = data[:i]
+                
+                if past_data:
+                    # Calculate resistance as the maximum high up to the current point
+                    resistance = max(d["price_high"] for d in past_data)
+                    # Calculate support as the minimum low up to the current point
+                    support = min(d["price_low"] for d in past_data)
+                else:
+                    # Default values for the first data point
+                    resistance = None
+                    support = None
+                
+                resistance_levels.append(resistance)
+                support_levels.append(support)
+
+            # Write data to the CSV file
+            with open(filename, mode="w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                # Write the header
+                writer.writerow(["datetime", "open", "high", "low", "close", "volume", "support", "resistance"])
+                
+                # Write the rows
+                for entry, resistance, support in zip(data, resistance_levels, support_levels):
+                    writer.writerow([
+                        entry.get("time_period_start"),
+                        entry.get("price_open"),
+                        entry.get("price_high"),
+                        entry.get("price_low"),
+                        entry.get("price_close"),
+                        entry.get("volume_traded"),
+                        support,
+                        resistance
+                    ])
+
+            print(f"Data saved to {filename}")
+        else:
+            print("Response is empty.")
+    else:
+        # Handle other HTTP status codes
+        print(f"Failed to fetch data. Status code: {response.status_code}")
+
+# Example usage
+if __name__ == "__main__":
+    # Replace with your API key
+    api_key = d.COINAPI_GMAIL
+
+    # Test with different symbols, timeframes, and start dates
+    # Correct formats:
+    # - symbol: "BINANCE_SPOT_ETH_BTC" (Exchange_TradingPair format)
+    # - timeframe: "1HRS", "1DAY", "1MTH", etc. (valid CoinAPI period_id values)
+    # - start_date: "YYYY-MM-DDTHH:MM:SS" (ISO 8601 format)
+
+    fetch_ohlcv(
+        symbol="BINANCE_SPOT_SOL_USDT",
+        api_key = api_key,
+        timeframe="1HRS",
+        start_date="2023-03-01T00:00:00"
+    )
+
 '''
 def kill_switch():
 
