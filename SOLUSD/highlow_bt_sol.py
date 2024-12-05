@@ -30,7 +30,7 @@ class HighLowBreak(Strategy):
                 self.sell(sl=self.data.Close[-1] * (1 + self.stop_loss_pct),
                           tp=self.data.Close[-1] * (1 - self.stop_loss_pct * self.risk_reward_ratio))
 
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/SOLUSDT_240.csv')
+data = pd.read_csv('/home/ebsung/quanttrading/Data/SOLUSD_240.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
