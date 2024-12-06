@@ -2,13 +2,15 @@ from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
 from ta.trend import ADXIndicator
 import pandas as pd
-import numpy as np
+import ccxt
+from datetime import datetime, timedelta
 import multiprocessing
 
 # Set the multiprocessing start method to 'fork'
 multiprocessing.set_start_method('fork')
 
-class HighLowBreak(Strategy):
+
+class HighLowBreakLongOnly(Strategy):
     adx_period = 14
     adx_low = 25
     adx_high = 35
@@ -29,34 +31,65 @@ class HighLowBreak(Strategy):
             if crossover(self.data.Close, self.data.High[-2]):
                 self.buy(sl=self.data.Close[-1] * (1 - self.stop_loss_pct),
                          tp=self.data.Close[-1] * (1 + self.stop_loss_pct * self.risk_reward_ratio))
-            elif crossover(self.data.Low[-2], self.data.Close):
-                self.sell(sl=self.data.Close[-1] * (1 + self.stop_loss_pct),
-                          tp=self.data.Close[-1] * (1 - self.stop_loss_pct * self.risk_reward_ratio))
 
-# Load data
-data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_30.csv')
-data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
-data.set_index('datetime', inplace=True)
-data.sort_index(inplace=True)
+
+def fetch_ohlcv_kraken(symbol: str, timeframe: str, since: int):
+    """Fetch historical OHLCV data from Kraken using CCXT."""
+    exchange = ccxt.kraken({
+        'rateLimit': 1200,
+        'enableRateLimit': True
+    })
+
+    ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since)
+    df = pd.DataFrame(ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])  # Capitalize column names
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('datetime', inplace=True)
+    df.drop(columns=['timestamp'], inplace=True)
+    return df
+
+
+# Load CSV data
+csv_path = '/Users/ethansung/quant/memebot/Data/ETHUSD_240.csv'
+csv_data = pd.read_csv(csv_path)
+csv_data['datetime'] = pd.to_datetime(csv_data['datetime'], unit='s')  # Convert timestamp
+csv_data.set_index('datetime', inplace=True)
+csv_data.sort_index(inplace=True)
+
+# Get the last timestamp from the CSV data
+last_csv_timestamp = int(csv_data.index[-1].timestamp() * 1000)  # Convert to milliseconds
+
+# Fetch API data starting from the end of the CSV data
+symbol = 'ETH/USD'
+timeframe = '4h'
+api_data = fetch_ohlcv_kraken(symbol, timeframe, last_csv_timestamp)
+
+# Combine CSV and API data
+combined_data = pd.concat([csv_data, api_data])
+combined_data = combined_data[~combined_data.index.duplicated(keep='last')]  # Remove duplicates
+combined_data.sort_index(inplace=True)  # Ensure the data is sorted by datetime
 
 # Define the backtest
-backtest = Backtest(data, HighLowBreak, cash=100000, commission=.0025)
+backtest = Backtest(combined_data, HighLowBreakLongOnly, cash=100000, commission=.0025)
 
 # Print statement indicating the start of optimization
 print("Optimization is running...")
 
 # Run optimization
-output = backtest.optimize(
-    adx_period=range(10, 30, 2),  # Ensure this is a range object
-    adx_low=range(20, 30, 2),     # Ensure this is a range object
-    adx_high=range(30, 40, 2),    # Ensure this is a range object
-    risk_reward_ratio=[2, 3, 4, 5],  # Use a list instead of np.arange
-    stop_loss_pct=[0.01, 0.02, 0.03],         # Use a list instead of np.arange
+results = backtest.optimize(
+    adx_period=range(10, 30, 1),
+    adx_low=range(10, 30, 1),
+    adx_high=range(20, 50, 1),
+    risk_reward_ratio=[2, 3, 4, 5],
+    stop_loss_pct=[0.01, 0.02, 0.03, 0.04],
     maximize='Sharpe Ratio',
-    return_heatmap=False
+    return_heatmap=False,
+    method='skopt'
 )
 
+# Print the results summary
+print("Optimization Summary:")
+print(results)
+
 # Print the best parameters
-print("Optimization completed.")
-print("Best parameters found:")
-print(output['_strategy'])
+print("\nBest parameters:")
+print(results['_strategy'])

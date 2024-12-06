@@ -1,46 +1,16 @@
-'''
-adx_period=10,adx_low=26,adx_high=32,risk_reward_ratio=2,stop_loss_pct=0.03
-Start                     2024-01-01 00:00:00
-End                       2024-09-30 20:00:00
-Duration                    273 days 20:00:00
-Exposure Time [%]                   46.894032
-Equity Final [$]                258489.635375
-Equity Peak [$]                 263962.930475
-Return [%]                         158.489635
-Buy & Hold Return [%]               14.483696
-Return (Ann.) [%]                  254.341829
-Volatility (Ann.) [%]              135.603502
-Sharpe Ratio                         1.875629
-Sortino Ratio                       13.382622
-Calmar Ratio                        19.322624
-Max. Drawdown [%]                  -13.162903
-Avg. Drawdown [%]                   -2.257716
-Max. Drawdown Duration       36 days 12:00:00
-Avg. Drawdown Duration        3 days 13:00:00
-# Trades                                   58
-Win Rate [%]                        56.896552
-Best Trade [%]                       5.863512
-Worst Trade [%]                     -3.288872
-Avg. Trade [%]                       1.681154
-Max. Trade Duration          11 days 00:00:00
-Avg. Trade Duration           2 days 08:00:00
-Profit Factor                        2.269784
-Expectancy [%]                       1.777132
-SQN                                  2.737852
-_strategy                        HighLowBreak
-'''
-
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
 from ta.trend import ADXIndicator
 import pandas as pd
+import ccxt
+from datetime import datetime, timedelta
 
 class HighLowBreakLongOnly(Strategy):
-    adx_period = 10
+    adx_period = 28
     adx_low = 26
-    adx_high = 32
-    risk_reward_ratio = 2
-    stop_loss_pct = 0.03
+    adx_high = 46
+    risk_reward_ratio = 3
+    stop_loss_pct = 0.027
 
     def init(self):
         high = self.data.High
@@ -57,20 +27,49 @@ class HighLowBreakLongOnly(Strategy):
                 self.buy(sl=self.data.Close[-1] * (1 - self.stop_loss_pct),
                          tp=self.data.Close[-1] * (1 + self.stop_loss_pct * self.risk_reward_ratio))
 
-data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_240.csv')
-data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
-data.set_index('datetime', inplace=True)
-data.sort_index(inplace=True)
 
-# Define date range
-start_date = '2023-01-01'
-end_date = '2024-11-30'
+def fetch_ohlcv_kraken(symbol: str, timeframe: str, since: int):
+    """Fetch historical OHLCV data from Kraken using CCXT."""
+    exchange = ccxt.kraken({
+        'rateLimit': 1200,
+        'enableRateLimit': True
+    })
 
-# Filter data for date range
-data = data.loc[start_date:end_date]
+    ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since)
+    df = pd.DataFrame(ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])  # Capitalize column names
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('datetime', inplace=True)
+    df.drop(columns=['timestamp'], inplace=True)
+    return df
 
-backtest = Backtest(data, HighLowBreakLongOnly, cash=100000, commission=.0025)
 
+# Load CSV data
+csv_path = '/Users/ethansung/quant/memebot/Data/ETHUSD_240.csv'
+csv_data = pd.read_csv(csv_path)
+csv_data['datetime'] = pd.to_datetime(csv_data['datetime'], unit='s')  # Convert timestamp
+csv_data.set_index('datetime', inplace=True)
+csv_data.sort_index(inplace=True)
+
+# Get the last timestamp from the CSV data
+last_csv_timestamp = int(csv_data.index[-1].timestamp() * 1000)  # Convert to milliseconds
+
+# Fetch API data starting from the end of the CSV data
+symbol = 'ETH/USD'
+timeframe = '4h'
+api_data = fetch_ohlcv_kraken(symbol, timeframe, last_csv_timestamp)
+
+# Combine CSV and API data
+combined_data = pd.concat([csv_data, api_data])
+combined_data = combined_data[~combined_data.index.duplicated(keep='last')]  # Remove duplicates
+combined_data.sort_index(inplace=True)  # Ensure the data is sorted by datetime
+
+# Filter data for the desired date range
+start_date = '2024-01-01'
+end_date = '2024-12-06'
+filtered_data = combined_data.loc[start_date:end_date]
+
+# Define and run the backtest
+backtest = Backtest(filtered_data, HighLowBreakLongOnly, cash=100000, commission=.0025)
 output = backtest.run()
 
 print(output)
