@@ -75,5 +75,3 @@ if __name__ == "__main__":
     # Replace with your Kraken API credentials
     API_KEY = d.kraken_api_key
     API_SECRET = d.kraken_secret_key
-
-    place_bid_and_sell(API_KEY, API_SECRET)

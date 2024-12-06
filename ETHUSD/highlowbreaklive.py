@@ -40,7 +40,7 @@ class TradingConfig:
     order_timeout = 60    # seconds to wait for order to fill
     
     # Risk management
-    max_daily_loss_usd = 5
+    max_daily_loss_usd = 20
     minimum_usd_balance = 10
     
     # Technical parameters
@@ -57,6 +57,8 @@ class TradeState:
         self.daily_trades = 0
         self.last_trade_time = None
         self.last_reset_time = datetime.now()
+
+from backtesting.lib import crossover
 
 class TradingBot:
     def __init__(self):
@@ -147,8 +149,8 @@ class TradingBot:
                 self.exchange.create_market_order(
                     symbol=TradingConfig.symbol,
                     type='market',
-                    side='sell' if self.trade_state.current_position == 'buy' else 'buy',
-                    amount=abs(float(self.trade_amount_usd / self.trade_state.entry_price))
+                    side='sell',
+                    amount=TradingConfig.trade_amount_eth
                 )
                 self.trade_state.in_trade = False
                 logger.info("Strategy position closed")
@@ -156,6 +158,10 @@ class TradingBot:
             logger.error(f"Error closing position: {e}")
 
     def execute_trade(self, side: str, price: float) -> bool:
+        if side == 'sell':
+            # Ignore sell signals in a long-only strategy
+            return False
+
         try:
             # Check daily limits
             if (self.trade_state.daily_loss >= TradingConfig.max_daily_loss_usd):
@@ -175,12 +181,8 @@ class TradingBot:
             eth_amount = TradingConfig.trade_amount_eth
 
             # Calculate stop loss and take profit prices
-            if side == 'buy':
-                stop_loss = price * (1 - TradingConfig.stop_loss_pct)
-                take_profit = price * (1 + TradingConfig.stop_loss_pct * TradingConfig.risk_reward_ratio)
-            else:
-                stop_loss = price * (1 + TradingConfig.stop_loss_pct)
-                take_profit = price * (1 - TradingConfig.stop_loss_pct * TradingConfig.risk_reward_ratio)
+            stop_loss = price * (1 - TradingConfig.stop_loss_pct)
+            take_profit = price * (1 + TradingConfig.stop_loss_pct * TradingConfig.risk_reward_ratio)
 
             # Place the entry order
             entry_order = self.exchange.create_order(
@@ -200,7 +202,7 @@ class TradingBot:
                     stop_loss_order = self.exchange.create_order(
                         symbol=TradingConfig.symbol,
                         type='stop-loss',
-                        side='sell' if side == 'buy' else 'buy',
+                        side='sell',
                         amount=eth_amount,
                         price=stop_loss,
                     )
@@ -209,7 +211,7 @@ class TradingBot:
                     take_profit_order = self.exchange.create_order(
                         symbol=TradingConfig.symbol,
                         type='limit',
-                        side='sell' if side == 'buy' else 'buy',
+                        side='sell',
                         amount=eth_amount,
                         price=take_profit
                     )
@@ -278,8 +280,6 @@ class TradingBot:
         if TradingConfig.adx_low < current_adx < TradingConfig.adx_high:
             if crossover(df['close'], df['high'].shift(2)):
                 self.execute_trade('buy', current_price)
-            elif crossover(df['low'].shift(2), df['close']):
-                self.execute_trade('sell', current_price)
 
     def run(self):
         logger.info(f"Bot started! Running strategy on {TradingConfig.symbol}")
@@ -299,34 +299,9 @@ class TradingBot:
 
         while self.running:
             try:
-                current_time = datetime.now()
-                
-                # Calculate sleep time until next candle
-                sleep_until = current_time.replace(minute=0, second=0, microsecond=0)
-                while sleep_until <= current_time:
-                    sleep_until = sleep_until + pd.Timedelta(hours=4)
-                
-                sleep_seconds = (sleep_until - current_time).total_seconds()
-                
-                if sleep_seconds > 60:  # If more than a minute until next candle
-                    time.sleep(sleep_seconds - 60)  # Wake up 1 minute early
-                    # Wake up API with retries
-                    max_retries = 3
-                    for attempt in range(max_retries):
-                        try:
-                            self.exchange.fetch_time()  # Wake up API connection
-                            break
-                        except Exception as e:
-                            if attempt == max_retries - 1:
-                                logger.error(f"Failed to wake API after {max_retries} attempts")
-                            else:
-                                logger.warning(f"Failed to wake API (attempt {attempt + 1}/{max_retries}), retrying...")
-                                time.sleep(5)
-                    time.sleep(55)  # Sleep remaining time until candle close
-                
-                logger.info(f"Checking for trade opportunities... {current_time}")
+                logger.info(f"Checking for trade opportunities... {datetime.now()}")
                 self.run_strategy()
-                
+                time.sleep(240)  # 4-hour sleep to match timeframe
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
                 time.sleep(60)

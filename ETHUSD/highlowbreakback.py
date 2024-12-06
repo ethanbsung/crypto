@@ -35,7 +35,7 @@ from backtesting.lib import crossover
 from ta.trend import ADXIndicator
 import pandas as pd
 
-class HighLowBreak(Strategy):
+class HighLowBreakLongOnly(Strategy):
     adx_period = 10
     adx_low = 26
     adx_high = 32
@@ -56,11 +56,8 @@ class HighLowBreak(Strategy):
             if crossover(self.data.Close, self.data.High[-2]):
                 self.buy(sl=self.data.Close[-1] * (1 - self.stop_loss_pct),
                          tp=self.data.Close[-1] * (1 + self.stop_loss_pct * self.risk_reward_ratio))
-            elif crossover(self.data.Low[-2], self.data.Close):
-                self.sell(sl=self.data.Close[-1] * (1 + self.stop_loss_pct),
-                          tp=self.data.Close[-1] * (1 - self.stop_loss_pct * self.risk_reward_ratio))
 
-data = pd.read_csv('/home/ebsung/quanttrading/Data/ETHUSD_240.csv')
+data = pd.read_csv('/Users/ethansung/quant/memebot/Data/ETHUSD_240.csv')
 data['datetime'] = pd.to_datetime(data['datetime'], unit='s')
 data.set_index('datetime', inplace=True)
 data.sort_index(inplace=True)
@@ -72,7 +69,7 @@ end_date = '2024-11-30'
 # Filter data for date range
 data = data.loc[start_date:end_date]
 
-backtest = Backtest(data, HighLowBreak, cash=100000, commission=.0025)
+backtest = Backtest(data, HighLowBreakLongOnly, cash=100000, commission=.0025)
 
 output = backtest.run()
 
