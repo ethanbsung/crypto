@@ -8,3 +8,5 @@
 2024-12-08 19:30:09,346 - INFO - Bot started! Running strategy on ETH/USD
 2024-12-08 19:30:09,346 - INFO - Timeframe: 4h
 2024-12-08 19:30:09,346 - INFO - Trade amount: 0.002 ETH
+2024-12-08 19:48:48,871 - INFO - Shutdown signal received. Cleaning up...
+2024-12-08 19:51:05,209 - INFO - Bot started on ETH/USD, timeframe 4h
