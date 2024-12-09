@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 class TradingConfig:
     # Strategy parameters (matching backtest)
-    adx_period = 10
+    adx_period = 28
     adx_low = 26
-    adx_high = 32
-    risk_reward_ratio = 2
-    stop_loss_pct = 0.03
+    adx_high = 46
+    risk_reward_ratio = 3
+    stop_loss_pct = 0.027
     
     # Trading parameters
     trade_amount_eth = 0.002  # Fixed amount of ETH to trade

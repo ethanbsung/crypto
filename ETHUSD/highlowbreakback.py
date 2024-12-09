@@ -65,7 +65,7 @@ combined_data.sort_index(inplace=True)  # Ensure the data is sorted by datetime
 
 # Filter data for the desired date range
 start_date = '2024-01-01'
-end_date = '2024-12-06'
+end_date = '2024-12-08'
 filtered_data = combined_data.loc[start_date:end_date]
 
 # Define and run the backtest
