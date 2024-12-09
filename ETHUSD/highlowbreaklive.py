@@ -1,17 +1,16 @@
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import ccxt
 import pandas as pd
 from ta.trend import ADXIndicator
 from backtesting.lib import crossover
 import dontshare as d
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Optional
 import signal
-from pandas import Timedelta
+import threading
 
 # Set up logging
 logging.basicConfig(
@@ -64,25 +63,33 @@ class TradingBot:
         self.trade_state = TradeState()
         self.running = True
         self.is_shutting_down = False
-        
+        self.stop_event = threading.Event()
+
         signal.signal(signal.SIGINT, self.handle_shutdown)
         signal.signal(signal.SIGTERM, self.handle_shutdown)
+
+    def wake_up_api(self, retries=2, delay=5) -> bool:
+        for attempt in range(retries):
+            try:
+                self.exchange.public_get_time()
+                logger.info("API woken up successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to wake up API on attempt {attempt + 1}: {e}")
+                if attempt < retries - 1:
+                    logger.info(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+        logger.error("API wake-up failed after multiple attempts")
+        return False
 
     def handle_shutdown(self, signum, frame):
         if self.is_shutting_down:
             return
-            
         self.is_shutting_down = True
         logger.info("Shutdown signal received. Cleaning up...")
         self.running = False
+        self.stop_event.set()
         self.close_all_positions()
-
-    def reset_daily_metrics(self):
-        if datetime.now().date() != self.trade_state.last_reset_time.date():
-            self.trade_state.daily_loss = 0
-            self.trade_state.daily_trades = 0
-            self.trade_state.last_reset_time = datetime.now()
-            logger.info("Daily metrics reset")
 
     def fetch_data(self) -> Optional[pd.DataFrame]:
         try:
@@ -104,7 +111,7 @@ class TradingBot:
             if df.isnull().any().any():
                 logger.error("Invalid data: Missing values detected")
                 return None
-            
+
             invalid_candles = (
                 (df['high'] < df['low']) | 
                 (df['high'] < df['open']) | 
@@ -119,36 +126,15 @@ class TradingBot:
             df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('datetime', inplace=True)
             return df
-        except ccxt.NetworkError as e:
-            logger.error(f"Network error when fetching data: {str(e)}")
-            return None
-        except ccxt.ExchangeError as e:
+        except ccxt.BaseError as e:
             logger.error(f"Exchange error when fetching data: {str(e)}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error fetching data: {str(e)}")
             return None
 
-    def close_all_positions(self):
-        try:
-            if self.trade_state.in_trade:
-                self.exchange.create_market_order(
-                    symbol=TradingConfig.symbol,
-                    type='market',
-                    side='sell',
-                    amount=TradingConfig.trade_amount_eth
-                )
-                self.trade_state.in_trade = False
-                logger.info("Strategy position closed")
-        except Exception as e:
-            logger.error(f"Error closing position: {e}")
-
     def execute_trade(self, side: str, price: float) -> bool:
-        if side == 'sell':
-            return False
-
-        if price <= 0:
-            logger.error("Invalid entry price detected.")
+        if not self.wake_up_api() or side == 'sell' or price <= 0:
             return False
 
         try:
@@ -156,14 +142,6 @@ class TradingBot:
             usd_balance = float(balance['free'].get('USD', 0))
             if usd_balance < TradingConfig.minimum_usd_balance:
                 logger.error(f"Insufficient USD balance: ${usd_balance}")
-                return False
-
-            latest_ticker = self.exchange.fetch_ticker(TradingConfig.symbol)
-            current_price = float(latest_ticker['last'])
-            price_diff = abs(current_price - price) / price
-
-            if price_diff > TradingConfig.max_slippage:
-                logger.warning(f"Price slippage too high: {price_diff:.2%}")
                 return False
 
             eth_amount = TradingConfig.trade_amount_eth
@@ -191,7 +169,6 @@ class TradingBot:
                 return False
 
             self.trade_state.in_trade = True
-            self.trade_state.current_position = side
             self.trade_state.entry_price = price
             self.trade_state.stop_loss = stop_loss
             self.trade_state.take_profit = take_profit
@@ -212,25 +189,38 @@ class TradingBot:
             return
 
         current_price = df['close'].iloc[-1]
-
-        adx = ADXIndicator(
-            df['high'], df['low'], df['close'], TradingConfig.adx_period
-        ).adx()
-
+        adx = ADXIndicator(df['high'], df['low'], df['close'], TradingConfig.adx_period).adx()
         current_adx = adx.iloc[-1]
 
         if TradingConfig.adx_low < current_adx < TradingConfig.adx_high:
             if crossover(df['close'], df['high'].shift(2)):
                 self.execute_trade('buy', current_price)
 
+    def next_candle_time(self) -> datetime:
+        now = datetime.utcnow()
+        next_candle = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4)
+        return next_candle
+
     def run(self):
         logger.info(f"Bot started on {TradingConfig.symbol}, timeframe {TradingConfig.timeframe}")
         while self.running:
             try:
+                next_candle = self.next_candle_time()
+                wake_up_time = next_candle - timedelta(minutes=1)
+                wait_time = (wake_up_time - datetime.utcnow()).total_seconds()
+
+                logger.info(f"Waiting to wake up API in {wait_time / 60:.2f} minutes...")
+                self.stop_event.wait(timeout=wait_time)
+
+                if not self.running:
+                    break
+
+                logger.info("Waking up API before candle close...")
+                if not self.wake_up_api():
+                    continue
+
+                logger.info("Running strategy at candle close...")
                 self.run_strategy()
-                current_time = datetime.now()
-                sleep_until = current_time.replace(minute=0, second=0, microsecond=0) + Timedelta(hours=4)
-                time.sleep((sleep_until - current_time).total_seconds())
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
                 time.sleep(60)
