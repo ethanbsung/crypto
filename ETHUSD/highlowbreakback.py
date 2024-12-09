@@ -73,3 +73,4 @@ backtest = Backtest(filtered_data, HighLowBreakLongOnly, cash=100000, commission
 output = backtest.run()
 
 print(output)
+print("done")
